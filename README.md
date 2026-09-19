@@ -2,13 +2,12 @@
 
 ## Descripción
 
-Este proyecto implementa un pipeline de procesamiento de datos para cargar archivos CSV en una base de datos SQLite y mantener estadísticas incrementales sobre el campo `price`.
+Pipeline en Python para procesar archivos CSV de forma secuencial, almacenarlos en SQLite y mantener estadísticas incrementales sobre `price`.
 
-La solución procesa los archivos CSV de forma secuencial, evitando mantener todos los archivos simultáneamente en memoria.
+La solución procesa un archivo a la vez y no carga todos los archivos simultáneamente en memoria.
 
-## Estructura del proyecto
+## Estructura
 
-```text
 dataPruebaDataEngineer/
 │
 ├── data/
@@ -32,17 +31,58 @@ dataPruebaDataEngineer/
 
 * Python 3
 * SQLite
-* Módulos estándar: `csv`, `sqlite3` y `pathlib`
+* `csv`
+* `sqlite3`
+* `pathlib`
 
-SQLite viene integrada con Python, por lo que no requiere un servidor de base de datos adicional.
+## Flujo
 
-## Funcionamiento
+```text
+CSV
+ ↓
+Lectura secuencial
+ ↓
+Validación
+ ↓
+Carga en SQLite
+ ↓
+Actualización incremental de estadísticas
+ ↓
+Validación de resultados mediante SQL
+```
 
-Los archivos `2012-1.csv` a `2012-5.csv` se procesan uno a uno y sus registros se almacenan en la tabla `transactions`.
+Los archivos `2012-1.csv` a `2012-5.csv` se procesan en orden. Posteriormente, `validation.csv` se procesa utilizando el mismo flujo.
 
-Las estadísticas de `price` se mantienen de forma incremental en la tabla `statistics`, sin volver a recorrer los datos ya cargados.
+## Estadísticas
 
-También se cuenta con una tabla `rejected_rows` para registrar filas que no cumplan las validaciones. Los `price` vacíos se permiten y se almacenan como `NULL`.
+Durante el procesamiento se mantienen de forma incremental:
 
-Finalmente, `validation.csv` se procesa mediante el mismo flujo y los resultados se comparan contra una consulta directa a la base de datos.
+* Total de filas.
+* Cantidad de precios válidos.
+* Suma de `price`.
+* Mínimo.
+* Máximo.
+* Promedio.
 
+El promedio se obtiene a partir de la suma y la cantidad de precios válidos, evitando recalcular `AVG(price)` sobre todos los registros después de cada carga.
+
+## Validaciones
+
+Los registros son validados antes de almacenarse.
+
+* `timestamp` es obligatorio.
+* `price` puede ser `NULL`, pero si tiene valor debe ser numérico y no negativo.
+* `user_id` puede ser `NULL`, pero si tiene valor debe ser entero.
+* Las filas rechazadas se almacenan en `rejected_rows` con su motivo.
+
+## Ejecución
+
+Desde la carpeta raíz:
+
+```bash
+python src/pipeline.py
+```
+
+La base de datos `pipeline.db` se crea automáticamente en la carpeta `database/`.
+
+Durante la ejecución se muestran las estadísticas acumuladas, la consulta directa a la base de datos y la comparación antes y después de procesar `validation.csv`.
